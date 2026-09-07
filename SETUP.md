@@ -77,3 +77,31 @@ yarn dev
 | Backend  | FastAPI + Pydantic v2                         |
 | Storage  | SQLite (auto-created + seeded on first boot)  |
 | Proxy    | Next.js `rewrites()` reads `FASTAPI_URL`      |
+
+## Working with SQLite
+
+The database lives at `backend/roamly.db` and is a single file — you can copy it, back it up, or delete it at will.
+
+The FastAPI startup hook creates the schema and seeds 8 stays automatically. The full DDL (with indexes and column comments) lives in [`backend/schema.sql`](./backend/schema.sql).
+
+A small CLI helper is included at [`backend/db.py`](./backend/db.py):
+
+```bash
+# from the backend/ folder, with your venv active
+
+python db.py info        # tables + row counts
+python db.py listings    # id, title, location, price, type
+python db.py bookings    # id, listing_id, guest, dates, total, status
+python db.py path        # absolute path to the .db file
+python db.py reset       # delete the DB and reseed the 8 sample stays
+```
+
+You can also use any generic SQLite tool: `sqlite3 backend/roamly.db`, DBeaver, TablePlus, or the SQLite VS Code extension.
+
+**Schema at a glance**
+
+- `listings(id, title, location, region, country, price, rating, reviews, type, guests, bedrooms, beds, baths, host, host_initials, host_color, badge, host_id, description, amenities_json, images_json, created_at)`
+- `bookings(id, listing_id, listing_title, listing_image, location, guest_id, guest_name, host_id, start_date, end_date, guests, nights, subtotal, total, status, created_at)` with `FOREIGN KEY(listing_id) REFERENCES listings(id)`
+- Amenities and image URLs are stored as JSON strings and expanded to arrays before they leave the API layer.
+- `id` columns are UUID/string values generated in Python — SQLite `rowid` is never exposed.
+- Booking overlap protection is enforced in `main.py`, not with a SQLite constraint, so you can inspect near-conflicts if needed.
