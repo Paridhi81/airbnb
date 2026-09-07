@@ -83,19 +83,21 @@ All routes are exposed under `/api/*` and are proxied from Next.js to FastAPI vi
 
 ## Run locally
 
-```
-# 1. Backend
+**One-command setup** (see [`SETUP.md`](./SETUP.md) for a step-by-step troubleshooting guide):
+
+```bash
+cp .env.example .env
+cp backend/.env.example backend/.env
+yarn install
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r backend/requirements.txt
-uvicorn main:app --reload --host 127.0.0.1 --port 8001   # (from /backend)
 
-# 2. Frontend (in another shell)
-cp .env.example .env       # ensure FASTAPI_URL=http://127.0.0.1:8001
-yarn install
-yarn dev                   # opens http://localhost:3000
+yarn dev:all      # runs FastAPI (127.0.0.1:8001) + Next.js (localhost:3000)
 ```
 
-Next.js reads `FASTAPI_URL` and rewrites `/api/*` to your FastAPI instance. SQLite is created and seeded on the first FastAPI startup.
+Open http://localhost:3000. On first boot FastAPI creates `backend/roamly.db` and seeds 8 stays.
+
+> **Important**: `FASTAPI_URL` in your `.env` must match the port uvicorn is bound to (`8001` by default). If they mismatch, the frontend silently falls back to built-in seed data and bookings/host CRUD will not persist.
 
 ## Assumptions
 
