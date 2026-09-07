@@ -6,10 +6,14 @@ node_modules/
 .env
 *.gitbundle
 *.log
+*.tsbuildinfo
 backend/__pycache__/
 backend/roamly.db
 tests/
 test_reports/
+memory/
+roamly-*.zip
+roamly-*.gitbundle
 .pnp.*
 yarn-error.log
 node_modules/@next/swc-linux-arm64-gnu/next-swc.linux-arm64-gnu.node
