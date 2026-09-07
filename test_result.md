@@ -181,3 +181,72 @@
 ## agent_communication:
 ##     -agent: "testing"
 ##     -message: "Core browse/detail/booking/trips and filter/map/favorite flows passed against the public URL. Checkout explicitly states no real payment is processed. Please retest account menu actions and host dashboard with a more specific selector for the top-right menu button; automation accidentally opened Search stays because header contains nested search buttons. No app code changed."
+
+## backend
+##   - task: "FastAPI + SQLite replacement backend"
+##     implemented: true
+##     working: NA
+##     file: "/app/backend/main.py"
+##     stuck_count: 0
+##     priority: "high"
+##     needs_retesting: true
+##     status_history:
+##         -working: "NA"
+##         -agent: "main"
+##         -comment: "Added a standalone FastAPI API with SQLite schema, seeded stays, booking overlap checks, guest capacity validation, and host listing CRUD. Next.js rewrites to FASTAPI_URL when configured."
+##
+## frontend
+##   - task: "Next.js frontend FastAPI proxy configuration"
+##     implemented: true
+##     working: NA
+##     file: "/app/next.config.js"
+##     stuck_count: 0
+##     priority: "high"
+##     needs_retesting: true
+##     status_history:
+##         -working: "NA"
+##         -agent: "main"
+##         -comment: "Added an env-driven FASTAPI_URL rewrite so the existing Next.js UI can use the standalone FastAPI backend without hardcoded service URLs."
+##
+## test_plan:
+##   current_focus:
+##     - "FastAPI health, listing seed/filter/detail, and SQLite persistence"
+##     - "FastAPI booking totals, overlap blocking, and guest limits"
+##     - "FastAPI host listing create/update/delete and Next rewrite configuration"
+##   stuck_tasks: []
+##   test_all: false
+##   test_priority: "high_first"
+##
+## agent_communication:
+##     -agent: "main"
+##     -message: "Testing the exact-stack FastAPI + SQLite backend now. Do not use or modify the legacy Mongo API route; validate backend/main.py directly and report whether any code changes are needed."
+
+
+# Exact-stack FastAPI backend testing results (testing agent, sequence 4)
+## backend
+##   - task: "FastAPI + SQLite replacement backend"
+##     implemented: true
+##     working: true
+##     file: "/app/backend/main.py"
+##     stuck_count: 0
+##     priority: "high"
+##     needs_retesting: false
+##     status_history:
+##         -working: true
+##         -agent: "testing"
+##         -comment: "In-process backend_test.py passed with a temporary SQLite database: startup schema and exactly 8 seeds, sqlite health, q/category/maxPrice listing filters, detail lookup, UUID host listing CRUD, booking totals and confirmed status, overlap 409, guest capacity/date/range 400 responses, and guest booking retrieval. No application code changed."
+## frontend
+##   - task: "Next.js frontend FastAPI proxy configuration"
+##     implemented: true
+##     working: true
+##     file: "/app/next.config.js"
+##     stuck_count: 0
+##     priority: "high"
+##     needs_retesting: false
+##     status_history:
+##         -working: true
+##         -agent: "testing"
+##         -comment: "Node syntax/load check passed; rewrites() produced /api/:path* to ${FASTAPI_URL}/api/:path* using a supplied env value, with no hardcoded service URL."
+## agent_communication:
+##     -agent: "testing"
+##     -message: "Exact-stack backend verification passed using /app/backend_test.py and a temporary SQLite DB. TestClient was unavailable because httpx is not installed, so equivalent direct in-process FastAPI route testing was used. No application code was changed; only the testing script and this testing data were updated."

@@ -23,6 +23,12 @@ const nextConfig = {
     maxInactiveAge: 10000,
     pagesBufferLength: 2,
   },
+  async rewrites() {
+    const fastApiUrl = process.env.FASTAPI_URL;
+    return fastApiUrl
+      ? [{ source: '/api/:path*', destination: `${fastApiUrl}/api/:path*` }]
+      : [];
+  },
   async headers() {
     return [
       {

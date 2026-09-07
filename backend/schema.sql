@@ -1,0 +1,3 @@
+-- The FastAPI application creates this schema automatically on startup.
+-- SQLite tables: listings and bookings.
+-- All public ids are UUID/string ids; SQLite row ids are not exposed.
