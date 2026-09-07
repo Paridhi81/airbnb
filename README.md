@@ -1,48 +1,104 @@
 # Roamly Marketplace
 
-Roamly is a photo-forward Airbnb-inspired stay marketplace with a Next.js frontend and a standalone FastAPI + SQLite backend. It includes seeded homes, browse/search/filter experiences, listing details, date and guest validation, mocked checkout, My Trips, favorites, static map mode, and host listing CRUD.
+Roamly is a photo-forward Airbnb-inspired stay marketplace built with **Next.js (TypeScript)**, a **FastAPI** backend, and **SQLite** persistence. It includes seeded stays, browse/search/filter, listing detail, date and guest validation, mocked checkout, My Trips, favourites, a static map mode, and full host CRUD.
 
-## Included
+Live source: https://github.com/Paridhi81/airbnb
 
-- Responsive marketplace home with listing cards, category rail, search, filters, wishlist hearts, and static map pins
-- Listing detail gallery with amenities, host details, reviews, availability fields, guest controls, and price breakdown
-- End-to-end booking flow with overlap protection, guest capacity checks, persistent bookings, and My Trips
-- Host dashboard with persistent create, edit, and delete listing actions plus booking visibility
-- **MOCKED checkout**: no real payment provider or card data is stored
+## Tech stack
+
+- **Frontend**: Next.js 15 (App Router) with strict-mode TypeScript, Tailwind CSS, shadcn primitives, lucide-react icons
+- **Backend**: Python 3 + FastAPI + Pydantic
+- **Database**: SQLite (auto-created and seeded at first boot)
+- **Dev orchestration**: supervisord runs both the Next.js dev server and the FastAPI process
+
+## Features
+
+- Responsive marketplace home with listing grid, sticky header, category rail, search bar, filters, wishlist hearts, and a static map preview
+- Listing detail with photo gallery, amenities, host card, reviews, date-range picker, guest stepper, and live price breakdown
+- End-to-end booking flow with overlap prevention, guest-capacity checks, persistent bookings, and a "My Trips" view
+- Host dashboard with persistent create / edit / delete listings and upcoming bookings
+- **MOCKED** checkout (no real payment provider is called and no card data is stored)
 - **COMING SOON** dialogs for messaging, identity verification, login/signup, language/currency, Experiences, and Services
 
-## Run locally with FastAPI + SQLite
+## Project layout
 
-1. Copy `.env.example` to `.env` and set `FASTAPI_URL` to the address where the API will run.
-2. Install frontend packages with `yarn install`.
-3. Install backend packages with `python -m pip install -r backend/requirements.txt`.
-4. Start FastAPI from the project root with `uvicorn backend.main:app --reload`.
-5. Start Next.js in a second terminal with `yarn dev`.
-6. Open the local app at the URL provided by your Next.js runtime.
+```
+app/
+  layout.tsx              # Root HTML shell + metadata
+  page.tsx                # Marketplace client container (state + data fetching)
+  providers.tsx           # React Query provider (optional wrapper)
+  globals.css             # Tailwind base + tokens
 
-The Next.js rewrite reads `FASTAPI_URL` and forwards `/api/*` requests to FastAPI. SQLite is created automatically at `SQLITE_DB_PATH` and seeded on the first startup. Do not commit a real `.env` file or credentials.
+components/roamly/        # Modular, strictly-typed UI components
+  Header.tsx  SearchBar.tsx  CategoryRow.tsx  ListingCard.tsx
+  ListingDetail.tsx  SearchPanel.tsx  FilterPanel.tsx
+  TripsModal.tsx  HostModal.tsx  CheckoutModal.tsx  MenuModal.tsx
+  ComingSoonModal.tsx  Overlay.tsx  MapPanel.tsx  Toast.tsx  Logo.tsx
 
-## Architecture
+lib/
+  types.ts                # Listing, Booking, HostForm interfaces
+  data.ts                 # Fallback listings, curated images, categories
+  format.ts               # Currency, date, nights helpers + snake→camel normaliser
 
-- `app/page.js` — client-side marketplace UI and booking/host interactions
-- `app/layout.js` — page metadata and root layout
-- `backend/main.py` — FastAPI routes, SQLite schema creation, seed data, and booking rules
-- `backend/schema.sql` — SQLite schema notes
-- `next.config.js` — env-driven `/api/*` rewrite to FastAPI
-- SQLite tables: `listings` and `bookings`
-- Every application record uses a UUID-style `id`; SQLite row internals are never exposed
+backend/
+  main.py                 # FastAPI routes + SQLite schema + seed data
+  schema.sql              # SQLite table reference
+  requirements.txt        # fastapi, uvicorn, pydantic
+```
+
+## Database schema
+
+Two SQLite tables, all `id` columns are UUID-shaped strings:
+
+```
+listings(
+  id TEXT PK, title, description, location, region, country,
+  price REAL, rating REAL, reviews INT, type TEXT,
+  guests INT, bedrooms INT, beds INT, baths INT,
+  host TEXT, host_id TEXT, host_initials TEXT, host_color TEXT,
+  badge TEXT, amenities JSON, images JSON, created_at TEXT
+)
+
+bookings(
+  id TEXT PK, listing_id TEXT FK, guest_id TEXT, guest_name TEXT,
+  start_date TEXT, end_date TEXT, guests INT,
+  nights INT, subtotal REAL, total REAL, status TEXT, created_at TEXT
+)
+```
 
 ## API overview
 
-- `GET /api/listings` — seeded listings with optional `q`, `category`, and `maxPrice` filters
-- `GET /api/listings/:id` — listing details
-- `POST /api/listings` — create a host listing
-- `PUT /api/listings/:id` — update a listing
-- `DELETE /api/listings/:id` — remove a listing
-- `GET /api/bookings?guestId=guest-demo` — guest trips
-- `POST /api/bookings` — validate and create a booking
-- `GET /api/host/listings?hostId=host-demo` — host listings and bookings
+All routes are exposed under `/api/*` and are proxied from Next.js to FastAPI via the `FASTAPI_URL` env var.
+
+| Method | Path | Purpose |
+| ------ | ---- | ------- |
+| GET  | `/api/listings` | Seeded listings, supports `q`, `category`, `maxPrice` filters |
+| GET  | `/api/listings/:id` | Listing detail |
+| POST | `/api/listings` | Create a host listing |
+| PUT  | `/api/listings/:id` | Update a listing |
+| DELETE | `/api/listings/:id` | Remove a listing |
+| GET  | `/api/bookings?guestId=guest-demo` | Guest trips |
+| POST | `/api/bookings` | Validate + create booking (blocks overlapping dates) |
+| GET  | `/api/host/listings?hostId=host-demo` | Host listings + upcoming bookings |
+
+## Run locally
+
+```
+# 1. Backend
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r backend/requirements.txt
+uvicorn main:app --reload --host 127.0.0.1 --port 8001   # (from /backend)
+
+# 2. Frontend (in another shell)
+cp .env.example .env       # ensure FASTAPI_URL=http://127.0.0.1:8001
+yarn install
+yarn dev                   # opens http://localhost:3000
+```
+
+Next.js reads `FASTAPI_URL` and rewrites `/api/*` to your FastAPI instance. SQLite is created and seeded on the first FastAPI startup.
 
 ## Assumptions
 
-The hosted preview service cannot be reconfigured from this workspace to run a second Python process, so use the downloadable source for the exact stack. Checkout, authentication, messaging, identity verification, live maps, and external integrations are intentionally represented as product flows or coming-soon states.
+- Real payment processing, live map with pricing pins, messaging, identity verification, and OAuth login are intentional **Coming Soon** or mocked flows to keep the demo self-contained.
+- The demo assumes a single hard-coded guest (`guest-demo` / "Alex Morgan") and host (`host-demo`) so booking and hosting flows can be exercised without an auth layer.
+- All record IDs are UUID-shaped strings; SQLite `rowid` values are never exposed to clients.
