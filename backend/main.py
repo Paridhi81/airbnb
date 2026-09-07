@@ -9,7 +9,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -65,6 +65,8 @@ CREATE TABLE IF NOT EXISTS bookings (
 
 
 class ListingCreate(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     title: str = Field(min_length=1)
     location: str = Field(min_length=1)
     price: int = Field(gt=0)
@@ -77,12 +79,14 @@ class ListingCreate(BaseModel):
     amenities: list[str] = Field(default_factory=lambda: ["Wifi", "Kitchen"])
     images: list[str] = Field(default_factory=list)
     host: str = "You"
-    host_id: str = "host-demo"
+    host_id: str = Field(default="host-demo", alias="hostId")
     region: str = ""
     country: str = "India"
 
 
 class ListingUpdate(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     title: Optional[str] = None
     location: Optional[str] = None
     price: Optional[int] = Field(default=None, gt=0)
@@ -98,12 +102,14 @@ class ListingUpdate(BaseModel):
 
 
 class BookingCreate(BaseModel):
-    listing_id: str
-    start_date: str
-    end_date: str
+    model_config = ConfigDict(populate_by_name=True)
+
+    listing_id: str = Field(alias="listingId")
+    start_date: str = Field(alias="startDate")
+    end_date: str = Field(alias="endDate")
     guests: int = Field(gt=0)
-    guest_id: str = "guest-demo"
-    guest_name: str = "Alex Morgan"
+    guest_id: str = Field(default="guest-demo", alias="guestId")
+    guest_name: str = Field(default="Alex Morgan", alias="guestName")
 
 
 def connect() -> sqlite3.Connection:
@@ -222,6 +228,25 @@ def get_bookings(guestId: str = "guest-demo") -> list[dict]:
     with closing(connect()) as connection:
         rows = connection.execute("SELECT * FROM bookings WHERE guest_id = ? ORDER BY created_at DESC", (guestId,)).fetchall()
     return [serialize_booking(row) for row in rows]
+
+
+@api.get("/listings/{listing_id}/availability")
+def get_availability(listing_id: str) -> dict:
+    """Return the blocked (guest-booked) date ranges for a listing so
+    the frontend can grey them out on the calendar."""
+    with closing(connect()) as connection:
+        listing = connection.execute("SELECT id FROM listings WHERE id = ?", (listing_id,)).fetchone()
+        if not listing:
+            raise HTTPException(status_code=404, detail="Stay not found")
+        rows = connection.execute(
+            "SELECT start_date, end_date FROM bookings WHERE listing_id = ? AND status != 'cancelled' ORDER BY start_date",
+            (listing_id,),
+        ).fetchall()
+    return {
+        "listingId": listing_id,
+        "blocked": [{"startDate": r["start_date"], "endDate": r["end_date"]} for r in rows],
+    }
+
 
 
 @api.post("/bookings", status_code=status.HTTP_201_CREATED)

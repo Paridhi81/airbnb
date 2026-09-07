@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Map, Search, SlidersHorizontal } from 'lucide-react'
 
-import Header from '@/components/roamly/Header'
+import Header, { type Tab } from '@/components/roamly/Header'
 import CategoryRow from '@/components/roamly/CategoryRow'
 import ListingCard from '@/components/roamly/ListingCard'
 import ListingDetail from '@/components/roamly/ListingDetail'
@@ -16,15 +16,16 @@ import MenuModal from '@/components/roamly/MenuModal'
 import ComingSoonModal from '@/components/roamly/ComingSoonModal'
 import MapPanel from '@/components/roamly/MapPanel'
 import Toast from '@/components/roamly/Toast'
+import ExperiencesGrid from '@/components/roamly/ExperiencesGrid'
+import ServicesGrid from '@/components/roamly/ServicesGrid'
 
 import type { Booking, HostBundle, HostForm, Listing } from '@/lib/types'
 import { nightsBetween, normalizeListing } from '@/lib/format'
 import { CURATED_IMAGES, FALLBACK_LISTINGS, enrichListing } from '@/lib/data'
 import { DEFAULT_FILTERS, countActiveFilters, listingMatches, type Filters } from '@/lib/filters'
-
-const DEMO_GUEST_ID = 'guest-demo'
-const DEMO_GUEST_NAME = 'Alex Morgan'
-const DEMO_HOST_ID = 'host-demo'
+import { rangeOverlapsBlocked, type BlockedRange } from '@/lib/availability'
+import { useLocalStorageState } from '@/lib/useLocalStorageState'
+import { DEMO_GUEST, DEMO_HOST, userForRole, type Role } from '@/lib/auth'
 
 const createEmptyHostForm = (): HostForm => ({
   title: '',
@@ -38,12 +39,16 @@ const createEmptyHostForm = (): HostForm => ({
 })
 
 const App = () => {
+  const [role, setRole] = useLocalStorageState<Role>('roamly-role', 'guest')
+  const user = userForRole(role)
+
   const [listings, setListings] = useState<Listing[]>(FALLBACK_LISTINGS)
   const [bookings, setBookings] = useState<Booking[]>([])
   const [query, setQuery] = useState<string>('')
   const [activeCategory, setActiveCategory] = useState<string>('All stays')
   const [filters, setFilters] = useState<Filters>({ ...DEFAULT_FILTERS })
   const [guests, setGuests] = useState<number>(0)
+  const [activeTab, setActiveTab] = useState<Tab>('homes')
 
   const [showSearchPanel, setShowSearchPanel] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
@@ -55,21 +60,29 @@ const App = () => {
   const [comingSoon, setComingSoon] = useState<string>('')
 
   const [selected, setSelected] = useState<Listing | null>(null)
-  const [liked, setLiked] = useState<string[]>([])
+  const [liked, setLiked] = useLocalStorageState<string[]>('roamly-liked', [])
   const [startDate, setStartDate] = useState<string>('')
   const [endDate, setEndDate] = useState<string>('')
   const [detailGuests, setDetailGuests] = useState<number>(1)
   const [toast, setToast] = useState<string>('')
+  const [blockedRanges, setBlockedRanges] = useState<BlockedRange[]>([])
 
   const [hostListings, setHostListings] = useState<Listing[]>([])
   const [hostBookings, setHostBookings] = useState<Booking[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [hostForm, setHostForm] = useState<HostForm>(createEmptyHostForm())
 
-  const notify = (message: string) => {
+  const notify = useCallback((message: string) => {
     setToast(message)
     window.setTimeout(() => setToast(''), 3200)
-  }
+  }, [])
+
+  const refreshGuestBookings = useCallback(() => {
+    fetch(`/api/bookings?guestId=${DEMO_GUEST.id}`)
+      .then((response) => (response.ok ? response.json() : []))
+      .then((data: Booking[]) => setBookings((data || []).map((item) => normalizeListing(item))))
+      .catch(() => undefined)
+  }, [])
 
   useEffect(() => {
     fetch('/api/listings')
@@ -78,12 +91,8 @@ const App = () => {
         if (data?.length) setListings(data.map((item) => enrichListing(normalizeListing(item))))
       })
       .catch(() => notify('Showing our handpicked stays for now'))
-
-    fetch(`/api/bookings?guestId=${DEMO_GUEST_ID}`)
-      .then((response) => (response.ok ? response.json() : []))
-      .then((data: Booking[]) => setBookings((data || []).map((item) => normalizeListing(item))))
-      .catch(() => undefined)
-  }, [])
+    refreshGuestBookings()
+  }, [notify, refreshGuestBookings])
 
   const filteredListings = useMemo(
     () =>
@@ -103,19 +112,42 @@ const App = () => {
   )
 
   const activeFilterCount = countActiveFilters(filters)
-
   const selectedNights = nightsBetween(startDate, endDate)
   const selectedTotal = selected ? Math.round(selectedNights * selected.price * 1.14) : 0
+
+  const loadAvailability = useCallback(async (listingId: string) => {
+    try {
+      const response = await fetch(`/api/listings/${listingId}/availability`)
+      if (!response.ok) throw new Error('unavailable')
+      const data = (await response.json()) as { blocked: BlockedRange[] }
+      setBlockedRanges(data.blocked || [])
+    } catch {
+      setBlockedRanges([])
+    }
+  }, [])
 
   const openListing = (listing: Listing) => {
     setSelected(listing)
     setStartDate('')
     setEndDate('')
     setDetailGuests(1)
+    setBlockedRanges([])
+    void loadAvailability(listing.id)
+  }
+
+  const handleDateChange = (start: string, end: string) => {
+    if (start && end && rangeOverlapsBlocked(start, end, blockedRanges)) {
+      notify('Those dates overlap an existing booking — please pick another range')
+      setStartDate(start)
+      setEndDate('')
+      return
+    }
+    setStartDate(start)
+    setEndDate(end)
   }
 
   const toggleLike = (id: string) =>
-    setLiked((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]))
+    setLiked(liked.includes(id) ? liked.filter((item) => item !== id) : [...liked, id])
 
   const showComingSoon = (label: string) => {
     setShowMenu(false)
@@ -132,6 +164,10 @@ const App = () => {
       notify(`This stay hosts up to ${selected.guests} guests`)
       return
     }
+    if (rangeOverlapsBlocked(startDate, endDate, blockedRanges)) {
+      notify('Those dates are already booked — pick another range')
+      return
+    }
     setShowCheckout(true)
   }
 
@@ -146,33 +182,18 @@ const App = () => {
           startDate,
           endDate,
           guests: detailGuests,
-          guestId: DEMO_GUEST_ID,
-          guestName: DEMO_GUEST_NAME,
+          guestId: DEMO_GUEST.id,
+          guestName: DEMO_GUEST.name,
         }),
       })
       const data = await response.json().catch(() => null)
       if (!response.ok) {
-        notify(data?.error || 'Those dates are unavailable')
+        notify(data?.detail || data?.error || 'Those dates are unavailable')
         return
       }
-      const localFallback: Booking = {
-        id: `local-${Date.now()}`,
-        listingId: selected.id,
-        listingTitle: selected.title,
-        listingImage: selected.images?.[0],
-        location: selected.location,
-        guestId: DEMO_GUEST_ID,
-        guestName: DEMO_GUEST_NAME,
-        startDate,
-        endDate,
-        guests: detailGuests,
-        nights: selectedNights,
-        subtotal: selectedNights * selected.price,
-        total: selectedTotal,
-        status: 'CONFIRMED',
-      }
-      const booking: Booking = data ? normalizeListing(data) : localFallback
+      const booking = normalizeListing<Booking>(data)
       setBookings((current) => [booking, ...current])
+      setBlockedRanges((current) => [...current, { startDate, endDate }])
       setShowCheckout(false)
       setSelected(null)
       setShowTrips(true)
@@ -182,9 +203,9 @@ const App = () => {
     }
   }
 
-  const loadHost = async () => {
+  const loadHost = useCallback(async () => {
     try {
-      const response = await fetch(`/api/host/listings?hostId=${DEMO_HOST_ID}`)
+      const response = await fetch(`/api/host/listings?hostId=${DEMO_HOST.id}`)
       const data = (await response.json()) as HostBundle
       setHostListings((data?.listings || []).map((item) => enrichListing(normalizeListing(item))))
       setHostBookings((data?.bookings || []).map((item) => normalizeListing(item)))
@@ -192,9 +213,13 @@ const App = () => {
       setHostListings([])
       setHostBookings([])
     }
-  }
+  }, [])
 
   const openHost = () => {
+    if (role !== 'host') {
+      setRole('host')
+      notify('Switched to host mode')
+    }
     setShowHost(true)
     void loadHost()
   }
@@ -206,8 +231,9 @@ const App = () => {
       price: Number(hostForm.price),
       guests: Number(hostForm.guests) || 2,
       bedrooms: Number(hostForm.bedrooms) || 1,
-      host: 'You',
-      hostId: DEMO_HOST_ID,
+      host: DEMO_HOST.name,
+      hostId: DEMO_HOST.id,
+      host_id: DEMO_HOST.id,
       region: hostForm.location,
       images: [hostForm.image || CURATED_IMAGES[0]],
     }
@@ -258,91 +284,125 @@ const App = () => {
     setEditingId(null)
   }
 
+  const handleSwitchRole = (nextRole: Role) => {
+    setRole(nextRole)
+    setShowMenu(false)
+    notify(nextRole === 'host' ? 'You are now in host mode' : 'Back to guest mode')
+    if (nextRole === 'host') {
+      setShowHost(true)
+      void loadHost()
+    }
+  }
+
+  const isHomesTab = activeTab === 'homes'
+
   return (
     <main className="min-h-screen bg-white text-[#222222]">
       <Header
         query={query}
         setQuery={setQuery}
-        activeCategory={activeCategory}
-        setActiveCategory={setActiveCategory}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
         setShowSearchPanel={setShowSearchPanel}
         onLogoClick={() => {
           setQuery('')
           setActiveCategory('All stays')
+          setFilters({ ...DEFAULT_FILTERS })
+          setActiveTab('homes')
           setShowTrips(false)
           setShowHost(false)
         }}
         onHost={openHost}
         onMenu={() => setShowMenu(true)}
         onComingSoon={showComingSoon}
+        role={role}
       />
 
       <div className="mx-auto max-w-[1440px] px-5 lg:px-10">
-        <CategoryRow activeCategory={activeCategory} setActiveCategory={setActiveCategory} />
+        {activeTab === 'homes' && (
+          <CategoryRow activeCategory={activeCategory} setActiveCategory={setActiveCategory} />
+        )}
 
-        <section className="flex items-center justify-between py-5">
-          <div>
-            <h1 className="text-[25px] font-semibold tracking-[-.7px]">Stays that feel like a getaway</h1>
-            <p className="mt-1 text-sm text-[#717171]">Curated homes for your next long weekend</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowFilters(true)}
-              className={`flex items-center gap-2 rounded-full border px-4 py-3 text-sm font-semibold transition ${
-                activeFilterCount > 0
-                  ? 'border-[#222222] bg-[#f7f7f7]'
-                  : 'border-[#dddddd] hover:border-[#222222]'
-              }`}
-            >
-              <SlidersHorizontal size={16} /> Filters
-              {activeFilterCount > 0 && (
-                <span className="rounded-full bg-[#222222] px-2 py-0.5 text-[11px] font-bold text-white">
-                  {activeFilterCount}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setShowMap((value) => !value)}
-              className={`hidden items-center gap-2 rounded-full border px-4 py-3 text-sm font-semibold sm:flex ${
-                showMap ? 'border-[#222222] bg-[#f7f7f7]' : 'border-[#dddddd]'
-              }`}
-            >
-              <Map size={16} /> {showMap ? 'Hide map' : 'Show map'}
-            </button>
-          </div>
-        </section>
-
-        <div className={showMap ? 'grid gap-6 lg:grid-cols-[1fr_480px] xl:grid-cols-[1fr_560px]' : ''}>
-          <section className={`grid grid-cols-1 gap-x-5 gap-y-9 sm:grid-cols-2 ${showMap ? 'lg:grid-cols-2' : 'lg:grid-cols-3 xl:grid-cols-4'}`}>
-            {filteredListings.map((listing) => (
-              <ListingCard
-                key={listing.id}
-                listing={listing}
-                liked={liked.includes(listing.id)}
-                onLike={() => toggleLike(listing.id)}
-                onOpen={() => openListing(listing)}
-              />
-            ))}
-            {!filteredListings.length && (
-              <div className="col-span-full rounded-2xl border border-dashed border-[#dddddd] py-20 text-center">
-                <Search className="mx-auto text-[#717171]" />
-                <h2 className="mt-4 text-xl font-semibold">No stays found</h2>
-                <p className="mt-2 text-sm text-[#717171]">Try a different location or loosen your filters.</p>
+        {isHomesTab && (
+          <>
+            <section className="flex items-center justify-between py-5">
+              <div>
+                <h1 className="text-[25px] font-semibold tracking-[-.7px]">
+                  Stays that feel like a getaway
+                </h1>
+                <p className="mt-1 text-sm text-[#717171]">
+                  Curated homes for your next long weekend
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
                 <button
-                  onClick={() => {
-                    setQuery('')
-                    setFilters({ ...DEFAULT_FILTERS })
-                    setActiveCategory('All stays')
-                  }}
-                  className="mt-5 rounded-lg bg-[#222222] px-5 py-3 text-sm font-semibold text-white"
+                  onClick={() => setShowFilters(true)}
+                  className={`flex items-center gap-2 rounded-full border px-4 py-3 text-sm font-semibold transition ${
+                    activeFilterCount > 0
+                      ? 'border-[#222222] bg-[#f7f7f7]'
+                      : 'border-[#dddddd] hover:border-[#222222]'
+                  }`}
                 >
-                  Clear search
+                  <SlidersHorizontal size={16} /> Filters
+                  {activeFilterCount > 0 && (
+                    <span className="rounded-full bg-[#222222] px-2 py-0.5 text-[11px] font-bold text-white">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </button>
+                <button
+                  onClick={() => setShowMap((value) => !value)}
+                  className={`hidden items-center gap-2 rounded-full border px-4 py-3 text-sm font-semibold sm:flex ${
+                    showMap ? 'border-[#222222] bg-[#f7f7f7]' : 'border-[#dddddd]'
+                  }`}
+                >
+                  <Map size={16} /> {showMap ? 'Hide map' : 'Show map'}
                 </button>
               </div>
-            )}
-          </section>
-          {showMap && <MapPanel listings={filteredListings} onOpen={openListing} />}
-        </div>
+            </section>
+
+            <div className={showMap ? 'grid gap-6 lg:grid-cols-[1fr_480px] xl:grid-cols-[1fr_560px]' : ''}>
+              <section
+                className={`grid grid-cols-1 gap-x-5 gap-y-9 sm:grid-cols-2 ${
+                  showMap ? 'lg:grid-cols-2' : 'lg:grid-cols-3 xl:grid-cols-4'
+                }`}
+              >
+                {filteredListings.map((listing) => (
+                  <ListingCard
+                    key={listing.id}
+                    listing={listing}
+                    liked={liked.includes(listing.id)}
+                    onLike={() => toggleLike(listing.id)}
+                    onOpen={() => openListing(listing)}
+                  />
+                ))}
+                {!filteredListings.length && (
+                  <div className="col-span-full rounded-2xl border border-dashed border-[#dddddd] py-20 text-center">
+                    <Search className="mx-auto text-[#717171]" />
+                    <h2 className="mt-4 text-xl font-semibold">No stays found</h2>
+                    <p className="mt-2 text-sm text-[#717171]">
+                      Try a different location or loosen your filters.
+                    </p>
+                    <button
+                      onClick={() => {
+                        setQuery('')
+                        setFilters({ ...DEFAULT_FILTERS })
+                        setActiveCategory('All stays')
+                      }}
+                      className="mt-5 rounded-lg bg-[#222222] px-5 py-3 text-sm font-semibold text-white"
+                    >
+                      Clear search
+                    </button>
+                  </div>
+                )}
+              </section>
+              {showMap && <MapPanel listings={filteredListings} onOpen={openListing} />}
+            </div>
+          </>
+        )}
+
+        {activeTab === 'experiences' && <ExperiencesGrid onComingSoon={showComingSoon} />}
+        {activeTab === 'services' && <ServicesGrid onComingSoon={showComingSoon} />}
       </div>
 
       {showSearchPanel && (
@@ -367,9 +427,8 @@ const App = () => {
         <ListingDetail
           listing={selected}
           startDate={startDate}
-          setStartDate={setStartDate}
           endDate={endDate}
-          setEndDate={setEndDate}
+          onDateChange={handleDateChange}
           guests={detailGuests}
           setGuests={setDetailGuests}
           nights={selectedNights}
@@ -379,6 +438,7 @@ const App = () => {
           onClose={() => setSelected(null)}
           onReserve={reserve}
           onMessage={() => showComingSoon('Messaging with hosts')}
+          blockedRanges={blockedRanges}
         />
       )}
       {showTrips && <TripsModal bookings={bookings} onClose={() => setShowTrips(false)} />}
@@ -408,6 +468,7 @@ const App = () => {
       )}
       {showMenu && (
         <MenuModal
+          user={user}
           onClose={() => setShowMenu(false)}
           onTrips={() => {
             setShowMenu(false)
@@ -417,6 +478,7 @@ const App = () => {
             setShowMenu(false)
             openHost()
           }}
+          onSwitchRole={handleSwitchRole}
           onComingSoon={showComingSoon}
         />
       )}

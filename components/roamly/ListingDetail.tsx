@@ -3,13 +3,14 @@
 import { ArrowRight, ChevronLeft, Heart, Minus, Plus, Sparkles, Star, Wifi } from 'lucide-react'
 import type { Listing } from '@/lib/types'
 import { formatMoney } from '@/lib/format'
+import type { BlockedRange } from '@/lib/availability'
+import DateRangePicker from './DateRangePicker'
 
 interface ListingDetailProps {
   listing: Listing
   startDate: string
-  setStartDate: (value: string) => void
   endDate: string
-  setEndDate: (value: string) => void
+  onDateChange: (start: string, end: string) => void
   guests: number
   setGuests: (value: number) => void
   nights: number
@@ -19,6 +20,7 @@ interface ListingDetailProps {
   onClose: () => void
   onReserve: () => void
   onMessage: () => void
+  blockedRanges: BlockedRange[]
 }
 
 const REVIEWS: Array<{ author: string; initials: string; body: string; color: string }> = [
@@ -29,9 +31,8 @@ const REVIEWS: Array<{ author: string; initials: string; body: string; color: st
 const ListingDetail = ({
   listing,
   startDate,
-  setStartDate,
   endDate,
-  setEndDate,
+  onDateChange,
   guests,
   setGuests,
   nights,
@@ -40,6 +41,7 @@ const ListingDetail = ({
   onLike,
   onClose,
   onReserve,
+  blockedRanges,
 }: ListingDetailProps) => (
   <div className="fixed inset-0 z-50 overflow-y-auto bg-white">
     <div className="mx-auto max-w-[1240px] px-5 py-5 lg:px-10">
@@ -152,25 +154,13 @@ const ListingDetail = ({
           <p className="text-xl">
             <strong>{formatMoney(listing.price)}</strong> <span className="text-sm font-normal">night</span>
           </p>
-          <div className="mt-5 grid grid-cols-2 overflow-hidden rounded-xl border border-[#999999]">
-            <label className="border-r border-[#999999] p-3 text-[10px] font-bold uppercase">
-              Check in
-              <input
-                type="date"
-                value={startDate}
-                onChange={(event) => setStartDate(event.target.value)}
-                className="mt-1 block w-full text-sm font-normal outline-none"
-              />
-            </label>
-            <label className="p-3 text-[10px] font-bold uppercase">
-              Check out
-              <input
-                type="date"
-                value={endDate}
-                onChange={(event) => setEndDate(event.target.value)}
-                className="mt-1 block w-full text-sm font-normal outline-none"
-              />
-            </label>
+          <div className="mt-5">
+            <DateRangePicker
+              startDate={startDate}
+              endDate={endDate}
+              onChange={onDateChange}
+              blockedRanges={blockedRanges}
+            />
           </div>
           <div className="mt-3 flex items-center justify-between rounded-xl border border-[#999999] p-3">
             <span className="text-[10px] font-bold uppercase">Guests</span>
