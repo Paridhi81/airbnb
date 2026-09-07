@@ -250,3 +250,51 @@
 ## agent_communication:
 ##     -agent: "testing"
 ##     -message: "Exact-stack backend verification passed using /app/backend_test.py and a temporary SQLite DB. TestClient was unavailable because httpx is not installed, so equivalent direct in-process FastAPI route testing was used. No application code was changed; only the testing script and this testing data were updated."
+
+
+# TypeScript migration + supervisor-managed FastAPI (main agent, sequence 5)
+## backend
+##   - task: "FastAPI + SQLite replacement backend"
+##     implemented: true
+##     working: NA
+##     file: "/app/backend/main.py"
+##     stuck_count: 0
+##     priority: "high"
+##     needs_retesting: true
+##     status_history:
+##         -working: "NA"
+##         -agent: "main"
+##         -comment: "Wired FastAPI into supervisord as /etc/supervisor/conf.d/roamly-backend.conf on port 8001 and set FASTAPI_URL=http://127.0.0.1:8001 in /app/.env. Next.js /api/* rewrite now hits FastAPI in the running preview. No changes to backend code; please re-verify the same seed/filter/booking/host CRUD scenarios against the live proxy chain (Next.js /api -> FastAPI 8001)."
+## frontend
+##   - task: "TypeScript modular marketplace UI"
+##     implemented: true
+##     working: NA
+##     file: "/app/app/page.tsx"
+##     stuck_count: 0
+##     priority: "high"
+##     needs_retesting: false
+##     status_history:
+##         -working: "NA"
+##         -agent: "main"
+##         -comment: "Full frontend migration to strict-mode TypeScript. Deleted app/page.js, app/layout.js, app/providers.js, app/types.ts. New structure: app/{layout,page,providers}.tsx plus 15 modular components under components/roamly/*.tsx (Header, SearchBar, Logo, CategoryRow, ListingCard, ListingDetail, SearchPanel, FilterPanel, TripsModal, HostModal, CheckoutModal, MenuModal, ComingSoonModal, MapPanel, Overlay, Toast). Shared types in lib/types.ts, fallbacks/categories in lib/data.ts, helpers in lib/format.ts including snake_case->camelCase normaliser. Tailwind content globs extended to *.tsx. tsc --noEmit passes with strict:true. Screenshot confirms UI parity with previous JS version. Frontend testing is not requested until user approval."
+## agent_communication:
+##     -agent: "main"
+##     -message: "Please re-run the FastAPI + SQLite backend test suite against the live URL to confirm the Next.js rewrite proxy correctly forwards /api/* to the new supervisor-managed FastAPI on 127.0.0.1:8001. Backend code is unchanged; only the deployment wiring (supervisor conf + FASTAPI_URL in .env) changed."
+
+
+# Live proxy chain backend testing results (testing agent, sequence 6)
+## backend
+##   - task: "FastAPI + SQLite replacement backend"
+##     implemented: true
+##     working: true
+##     file: "/app/backend/main.py"
+##     stuck_count: 0
+##     priority: "high"
+##     needs_retesting: false
+##     status_history:
+##         -working: true
+##         -agent: "testing"
+##         -comment: "Comprehensive backend verification passed through the live public URL (https://property-portal-606.preview.emergentagent.com/api). All 50 test scenarios passed: (1) GET /listings returns 8 seeded listings with all required fields (id, title, location, price, rating, reviews, images, amenities); (2) Search filters work correctly - q=Noida returns Noida listings, category=Villa returns only Villas, maxPrice=4000 filters correctly; (3) GET /listings/{id} returns detail for seeded listing stay-01; (4) Host CRUD complete - POST /listings creates with UUID, PUT updates title/price, DELETE returns 200, GET deleted returns 404; (5) Booking happy path - POST /bookings calculates nights=4, correct subtotal (4*price), total with 14% markup, status=confirmed; (6) Overlap booking correctly returns 409; (7) Guest capacity exceeded returns 400; (8) Bad date range (end<=start) returns 400; (9) GET /bookings?guestId returns created bookings; (10) GET /host/listings?hostId returns {listings:[], bookings:[]} structure. Supervisor logs confirm roamly-backend running on 127.0.0.1:8001, Next.js proxy correctly forwarding /api/* requests. No application code was modified."
+## agent_communication:
+##     -agent: "testing"
+##     -message: "Backend API verification complete through the live proxy chain. All requested scenarios passed (seeded data, filters, detail, host CRUD, booking validation, overlap/capacity/date checks, guest/host queries). The FastAPI backend is correctly wired into supervisord and accessible through the Next.js /api/* rewrite. Updated /app/backend_test.py to use requests library for live URL testing. No bugs found - backend is production-ready."
