@@ -298,3 +298,38 @@
 ## agent_communication:
 ##     -agent: "testing"
 ##     -message: "Backend API verification complete through the live proxy chain. All requested scenarios passed (seeded data, filters, detail, host CRUD, booking validation, overlap/capacity/date checks, guest/host queries). The FastAPI backend is correctly wired into supervisord and accessible through the Next.js /api/* rewrite. Updated /app/backend_test.py to use requests library for live URL testing. No bugs found - backend is production-ready."
+
+# User-reported bug: preview vs local mismatch (main agent, sequence 6)
+## backend
+##   - task: "FastAPI + SQLite replacement backend"
+##     implemented: true
+##     working: NA
+##     file: "/app/backend/main.py"
+##     stuck_count: 0
+##     priority: "high"
+##     needs_retesting: true
+##     status_history:
+##         -working: "NA"
+##         -agent: "main"
+##         -comment: "USER BUG: 'preview in the web and my laptop don't match'. Root cause identified: .env.example shipped FASTAPI_URL=http://localhost:8000 but supervisor + README use 8001, so on the user's laptop Next.js proxies to a dead port and the app silently falls back to FALLBACK_LISTINGS with no persistence. Fixes applied WITHOUT changing backend code: (a) rewrote .env.example to FASTAPI_URL=http://127.0.0.1:8001, (b) rewrote backend/.env.example with UVICORN_HOST/UVICORN_PORT for clarity, (c) added `yarn dev:all` script using concurrently to boot uvicorn + Next.js together, (d) added SETUP.md with a troubleshooting matrix, (e) linked SETUP.md from README, (f) regenerated roamly-airbnb-clone.zip. Please re-verify the live public API chain is intact — no backend/main.py logic changed."
+## agent_communication:
+##     -agent: "main"
+##     -message: "Please retest the FastAPI + SQLite backend through the live public URL https://property-portal-606.preview.emergentagent.com/api/... to confirm the previously-passing 50 scenarios still pass after config/doc changes. Only .env.example, backend/.env.example, package.json scripts, README.md, and a new SETUP.md changed — no application code."
+
+# Regression test after documentation/env fix (testing agent, sequence 7)
+## backend
+##   - task: "FastAPI + SQLite replacement backend"
+##     implemented: true
+##     working: true
+##     file: "/app/backend/main.py"
+##     stuck_count: 0
+##     priority: "high"
+##     needs_retesting: false
+##     status_history:
+##         -working: true
+##         -agent: "testing"
+##         -comment: "Regression test PASSED - All 50 test scenarios passed through the live public URL (https://property-portal-606.preview.emergentagent.com/api). Verified: (1) GET /listings returns 8 seeded listings with all required fields (id, title, location, price, rating, reviews, images, amenities); (2) Search filters work - q=Noida returns Noida listings, category=Villa returns only Villas, maxPrice=4000 filters correctly; (3) GET /listings/stay-01 returns detail; (4) Host CRUD complete - POST creates with UUID (201), PUT updates title/price (200), DELETE returns 200, GET deleted returns 404; (5) Booking happy path - POST calculates nights=4, correct subtotal (4*price), total with 14% markup, status=confirmed; (6) Overlap booking returns 409; (7) Guest capacity exceeded returns 400; (8) Bad date range (end<=start) returns 400; (9) GET /bookings?guestId returns created bookings; (10) GET /host/listings?hostId returns {listings:[], bookings:[]} structure. Supervisor logs confirm roamly-backend running on 127.0.0.1:8001. No application code was modified. Minor improvement: Updated /app/backend_test.py to use randomized future dates for booking tests to avoid conflicts from previous test runs."
+## agent_communication:
+##     -agent: "testing"
+##     -message: "Regression test complete - all 50 scenarios passed. The documentation/env fixes (.env.example, backend/.env.example, package.json scripts, README.md, SETUP.md) did not break any functionality. The FastAPI backend is working correctly through the full proxy chain (Next.js → FastAPI 8001 → SQLite). No bugs found."
+

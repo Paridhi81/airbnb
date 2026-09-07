@@ -193,13 +193,16 @@ def test_booking_happy_path():
                 listing_id = listing["id"]
                 listing_price = listing["price"]
                 
-                # Create booking
+                # Create booking with unique future dates
+                import random
+                month = random.randint(1, 12)
+                day = random.randint(1, 20)
                 booking_data = {
                     "listing_id": listing_id,
-                    "start_date": "2026-12-01",
-                    "end_date": "2026-12-05",
+                    "start_date": f"2028-{month:02d}-{day:02d}",
+                    "end_date": f"2028-{month:02d}-{day+4:02d}",
                     "guests": 2,
-                    "guest_id": "guest-test-demo",
+                    "guest_id": f"guest-test-{random.randint(10000, 99999)}",
                     "guest_name": "Priya Sharma"
                 }
                 
@@ -233,13 +236,16 @@ def test_booking_overlap():
             if listings:
                 listing_id = listings[0]["id"]
                 
-                # Create first booking
+                # Create first booking with unique dates
+                import random
+                month = random.randint(1, 12)
+                day = random.randint(1, 20)
                 booking_data = {
                     "listing_id": listing_id,
-                    "start_date": "2027-01-10",
-                    "end_date": "2027-01-15",
+                    "start_date": f"2030-{month:02d}-{day:02d}",
+                    "end_date": f"2030-{month:02d}-{day+5:02d}",
                     "guests": 2,
-                    "guest_id": "guest-overlap-test",
+                    "guest_id": f"guest-overlap-{random.randint(10000, 99999)}",
                     "guest_name": "Test User"
                 }
                 
@@ -266,12 +272,15 @@ def test_booking_guest_capacity():
                 max_guests = listing.get("guests", 2)
                 
                 # Try to book with too many guests
+                import random
+                month = random.randint(1, 12)
+                day = random.randint(1, 20)
                 booking_data = {
                     "listing_id": listing_id,
-                    "start_date": "2027-02-01",
-                    "end_date": "2027-02-05",
+                    "start_date": f"2031-{month:02d}-{day:02d}",
+                    "end_date": f"2031-{month:02d}-{day+4:02d}",
                     "guests": max_guests + 5,  # Exceed capacity
-                    "guest_id": "guest-capacity-test",
+                    "guest_id": f"guest-capacity-{random.randint(10000, 99999)}",
                     "guest_name": "Test User"
                 }
                 
@@ -293,12 +302,15 @@ def test_booking_bad_dates():
                 listing_id = listings[0]["id"]
                 
                 # Try booking with end date same as start date
+                import random
+                month = random.randint(1, 12)
+                day = random.randint(1, 20)
                 booking_data = {
                     "listing_id": listing_id,
-                    "start_date": "2027-03-01",
-                    "end_date": "2027-03-01",  # Same as start
+                    "start_date": f"2032-{month:02d}-{day:02d}",
+                    "end_date": f"2032-{month:02d}-{day:02d}",  # Same as start
                     "guests": 2,
-                    "guest_id": "guest-baddate-test",
+                    "guest_id": f"guest-baddate-{random.randint(10000, 99999)}",
                     "guest_name": "Test User"
                 }
                 
@@ -319,11 +331,14 @@ def test_get_guest_bookings():
             if listings:
                 listing_id = listings[0]["id"]
                 
-                guest_id = "guest-query-test-unique"
+                import random
+                guest_id = f"guest-query-test-{random.randint(10000, 99999)}"
+                month = random.randint(1, 12)
+                day = random.randint(1, 20)
                 booking_data = {
                     "listing_id": listing_id,
-                    "start_date": "2027-04-01",
-                    "end_date": "2027-04-05",
+                    "start_date": f"2029-{month:02d}-{day:02d}",
+                    "end_date": f"2029-{month:02d}-{day+4:02d}",
                     "guests": 2,
                     "guest_id": guest_id,
                     "guest_name": "Query Test User"
