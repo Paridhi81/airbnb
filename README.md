@@ -30,7 +30,7 @@ The Next.js rewrite reads `FASTAPI_URL` and forwards `/api/*` requests to FastAP
 - `backend/schema.sql` — SQLite schema notes
 - `next.config.js` — env-driven `/api/*` rewrite to FastAPI
 - SQLite tables: `listings` and `bookings`
-- Every application record uses a UUID-style `id`; Mongo internal `_id` values are removed from API responses
+- Every application record uses a UUID-style `id`; SQLite row internals are never exposed
 
 ## API overview
 
@@ -45,4 +45,4 @@ The Next.js rewrite reads `FASTAPI_URL` and forwards `/api/*` requests to FastAP
 
 ## Assumptions
 
-The hosted preview supplied for this task remains on its protected Next.js/MongoDB runtime, but this downloadable source now includes the requested FastAPI + SQLite backend and an environment-driven Next.js proxy for local use. Checkout, authentication, messaging, identity verification, live maps, and external integrations are intentionally represented as product flows or coming-soon states.
+The hosted preview service cannot be reconfigured from this workspace to run a second Python process, so use the downloadable source for the exact stack. Checkout, authentication, messaging, identity verification, live maps, and external integrations are intentionally represented as product flows or coming-soon states.
