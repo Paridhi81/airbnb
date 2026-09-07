@@ -24,6 +24,12 @@ export interface Listing {
   description?: string
   amenities: string[]
   images: string[]
+  lat?: number
+  lng?: number
+  placeType?: 'entire' | 'room'
+  instantBook?: boolean
+  selfCheckIn?: boolean
+  petsAllowed?: boolean
 }
 
 export interface Booking {

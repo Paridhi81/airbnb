@@ -40,6 +40,34 @@ export const HEADER_NAV: Array<{ label: string; icon: LucideIcon }> = [
   { label: 'Services', icon: Bell },
 ]
 
+export const LOCATION_COORDS: Record<string, [number, number]> = {
+  'Sector 63, Noida': [28.6285, 77.3712],
+  'Chattarpur, New Delhi': [28.5069, 77.1734],
+  'Lodhi Colony, New Delhi': [28.5891, 77.2273],
+  'Greater Kailash, New Delhi': [28.5442, 77.2418],
+  'Hauz Khas, New Delhi': [28.5494, 77.2001],
+  'Aravalli Hills, Gurugram': [28.4089, 77.0421],
+  'Assagao, Goa': [15.6154, 73.7526],
+  'Naukuchiatal, Uttarakhand': [29.3253, 79.5714],
+}
+
+const withExtras = (listing: Listing): Listing => {
+  const coords = LOCATION_COORDS[listing.location]
+  const inferredPlaceType: 'entire' | 'room' = listing.type === 'Apartment' ? 'room' : 'entire'
+  return {
+    ...listing,
+    lat: listing.lat ?? coords?.[0],
+    lng: listing.lng ?? coords?.[1],
+    placeType: listing.placeType ?? inferredPlaceType,
+    instantBook: listing.instantBook ?? true,
+    selfCheckIn: listing.selfCheckIn ?? listing.type !== 'Villa',
+    petsAllowed: listing.petsAllowed ?? (listing.type === 'Villa' || listing.type === 'Home'),
+  }
+}
+
+export const enrichListing = (listing: Listing): Listing => withExtras(listing)
+
+
 export const FALLBACK_LISTINGS: Listing[] = [
   { id: 'stay-01', title: 'Sunlit apartment with skyline views', location: 'Sector 63, Noida', price: 3700, rating: 4.92, reviews: 86, type: 'Apartment', guests: 4, bedrooms: 2, beds: 2, baths: 2, host: 'Riya', hostInitials: 'RK', hostColor: '#f9c5b7', badge: 'Guest favourite', description: 'Wake up to a wide city view in this calm, design-led home with plenty of light, a chef-ready kitchen, and a dedicated work corner.', amenities: ['Wifi', 'Kitchen', 'Workspace', 'Air conditioning'], images: [CURATED_IMAGES[0], CURATED_IMAGES[2], CURATED_IMAGES[1]] },
   { id: 'stay-02', title: 'Warm villa tucked into a quiet garden', location: 'Chattarpur, New Delhi', price: 5800, rating: 4.88, reviews: 121, type: 'Villa', guests: 6, bedrooms: 3, beds: 4, baths: 3, host: 'Arjun', hostInitials: 'AS', hostColor: '#bfe2d0', badge: 'Guest favourite', description: 'A leafy hideaway for slow mornings, long lunches, and evenings around the fire pit. The garden is all yours.', amenities: ['Wifi', 'Pool', 'Free parking', 'Kitchen'], images: [CURATED_IMAGES[1], CURATED_IMAGES[3], CURATED_IMAGES[6]] },
@@ -49,7 +77,7 @@ export const FALLBACK_LISTINGS: Listing[] = [
   { id: 'stay-06', title: 'Terrace home overlooking the Aravallis', location: 'Aravalli Hills, Gurugram', price: 6400, rating: 4.95, reviews: 39, type: 'Home', guests: 5, bedrooms: 2, beds: 3, baths: 2, host: 'Kabir', hostInitials: 'KM', hostColor: '#f2c4c4', badge: 'Amazing views', description: 'Trade the city noise for bird song and sunset skies. This warm terrace home is made for long weekends.', amenities: ['Wifi', 'Mountain view', 'Breakfast', 'Free parking'], images: [CURATED_IMAGES[5], CURATED_IMAGES[0], CURATED_IMAGES[4]] },
   { id: 'stay-07', title: 'A calm studio in the heart of Goa', location: 'Assagao, Goa', price: 3100, rating: 4.9, reviews: 101, type: 'Apartment', guests: 2, bedrooms: 1, beds: 1, baths: 1, host: 'Ishita', hostInitials: 'IP', hostColor: '#f6dca9', badge: 'Guest favourite', description: 'A light-filled studio with a shaded veranda, close to Goa\u2019s best bakeries and a short scooter ride from the beach.', amenities: ['Wifi', 'Pool', 'Kitchen', 'Garden'], images: [CURATED_IMAGES[6], CURATED_IMAGES[2], CURATED_IMAGES[1]] },
   { id: 'stay-08', title: 'Glass cabin above the cedar forest', location: 'Naukuchiatal, Uttarakhand', price: 8100, rating: 4.99, reviews: 28, type: 'Cabin', guests: 4, bedrooms: 2, beds: 2, baths: 2, host: 'Dev', hostInitials: 'DS', hostColor: '#c4dfdc', badge: 'Amazing views', description: 'Sleep beside the forest in a glass-walled cabin with a fireplace, a cedar deck, and nothing but green beyond it.', amenities: ['Wifi', 'Mountain view', 'Fireplace', 'Kitchen'], images: [CURATED_IMAGES[7], CURATED_IMAGES[5], CURATED_IMAGES[4]] },
-]
+].map(withExtras)
 
 export const EMPTY_HOST_FORM = {
   title: '',

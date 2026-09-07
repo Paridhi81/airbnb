@@ -19,7 +19,8 @@ import Toast from '@/components/roamly/Toast'
 
 import type { Booking, HostBundle, HostForm, Listing } from '@/lib/types'
 import { nightsBetween, normalizeListing } from '@/lib/format'
-import { CURATED_IMAGES, FALLBACK_LISTINGS } from '@/lib/data'
+import { CURATED_IMAGES, FALLBACK_LISTINGS, enrichListing } from '@/lib/data'
+import { DEFAULT_FILTERS, countActiveFilters, listingMatches, type Filters } from '@/lib/filters'
 
 const DEMO_GUEST_ID = 'guest-demo'
 const DEMO_GUEST_NAME = 'Alex Morgan'
@@ -41,7 +42,7 @@ const App = () => {
   const [bookings, setBookings] = useState<Booking[]>([])
   const [query, setQuery] = useState<string>('')
   const [activeCategory, setActiveCategory] = useState<string>('All stays')
-  const [maxPrice, setMaxPrice] = useState<number>(12000)
+  const [filters, setFilters] = useState<Filters>({ ...DEFAULT_FILTERS })
   const [guests, setGuests] = useState<number>(0)
 
   const [showSearchPanel, setShowSearchPanel] = useState(false)
@@ -74,7 +75,7 @@ const App = () => {
     fetch('/api/listings')
       .then((response) => (response.ok ? response.json() : Promise.reject()))
       .then((data: Listing[]) => {
-        if (data?.length) setListings(data.map((item) => normalizeListing(item)))
+        if (data?.length) setListings(data.map((item) => enrichListing(normalizeListing(item))))
       })
       .catch(() => notify('Showing our handpicked stays for now'))
 
@@ -89,7 +90,6 @@ const App = () => {
       listings.filter((listing) => {
         const text = `${listing.title} ${listing.location}`.toLowerCase()
         const matchesQuery = !query || text.includes(query.toLowerCase())
-        const matchesPrice = Number(listing.price) <= maxPrice
         const matchesCategory =
           activeCategory === 'All stays' ||
           activeCategory === 'Trending' ||
@@ -97,10 +97,12 @@ const App = () => {
           listing.type === activeCategory ||
           listing.badge === activeCategory ||
           listing.amenities.includes(activeCategory)
-        return matchesQuery && matchesPrice && matchesCategory
+        return matchesQuery && matchesCategory && listingMatches(listing, filters)
       }),
-    [listings, query, maxPrice, activeCategory]
+    [listings, query, filters, activeCategory]
   )
+
+  const activeFilterCount = countActiveFilters(filters)
 
   const selectedNights = nightsBetween(startDate, endDate)
   const selectedTotal = selected ? Math.round(selectedNights * selected.price * 1.14) : 0
@@ -184,7 +186,7 @@ const App = () => {
     try {
       const response = await fetch(`/api/host/listings?hostId=${DEMO_HOST_ID}`)
       const data = (await response.json()) as HostBundle
-      setHostListings((data?.listings || []).map((item) => normalizeListing(item)))
+      setHostListings((data?.listings || []).map((item) => enrichListing(normalizeListing(item))))
       setHostBookings((data?.bookings || []).map((item) => normalizeListing(item)))
     } catch {
       setHostListings([])
@@ -221,7 +223,7 @@ const App = () => {
       void loadHost()
       fetch('/api/listings')
         .then((r) => (r.ok ? r.json() : []))
-        .then((data: Listing[]) => data?.length && setListings(data.map((item) => normalizeListing(item))))
+        .then((data: Listing[]) => data?.length && setListings(data.map((item) => enrichListing(normalizeListing(item)))))
         .catch(() => undefined)
     } else {
       notify('Please add a title, location, and nightly price')
@@ -286,9 +288,18 @@ const App = () => {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowFilters(true)}
-              className="flex items-center gap-2 rounded-full border border-[#dddddd] px-4 py-3 text-sm font-semibold hover:border-[#222222]"
+              className={`flex items-center gap-2 rounded-full border px-4 py-3 text-sm font-semibold transition ${
+                activeFilterCount > 0
+                  ? 'border-[#222222] bg-[#f7f7f7]'
+                  : 'border-[#dddddd] hover:border-[#222222]'
+              }`}
             >
               <SlidersHorizontal size={16} /> Filters
+              {activeFilterCount > 0 && (
+                <span className="rounded-full bg-[#222222] px-2 py-0.5 text-[11px] font-bold text-white">
+                  {activeFilterCount}
+                </span>
+              )}
             </button>
             <button
               onClick={() => setShowMap((value) => !value)}
@@ -301,8 +312,8 @@ const App = () => {
           </div>
         </section>
 
-        <div className={showMap ? 'grid gap-6 lg:grid-cols-[1fr_360px]' : ''}>
-          <section className="grid grid-cols-1 gap-x-5 gap-y-9 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className={showMap ? 'grid gap-6 lg:grid-cols-[1fr_480px] xl:grid-cols-[1fr_560px]' : ''}>
+          <section className={`grid grid-cols-1 gap-x-5 gap-y-9 sm:grid-cols-2 ${showMap ? 'lg:grid-cols-2' : 'lg:grid-cols-3 xl:grid-cols-4'}`}>
             {filteredListings.map((listing) => (
               <ListingCard
                 key={listing.id}
@@ -320,7 +331,7 @@ const App = () => {
                 <button
                   onClick={() => {
                     setQuery('')
-                    setMaxPrice(12000)
+                    setFilters({ ...DEFAULT_FILTERS })
                     setActiveCategory('All stays')
                   }}
                   className="mt-5 rounded-lg bg-[#222222] px-5 py-3 text-sm font-semibold text-white"
@@ -345,7 +356,12 @@ const App = () => {
         />
       )}
       {showFilters && (
-        <FilterPanel maxPrice={maxPrice} setMaxPrice={setMaxPrice} onClose={() => setShowFilters(false)} />
+        <FilterPanel
+          filters={filters}
+          setFilters={setFilters}
+          matchCount={filteredListings.length}
+          onClose={() => setShowFilters(false)}
+        />
       )}
       {selected && (
         <ListingDetail
